@@ -1,17 +1,17 @@
 ---
 name: kernel-doc-zh-lkml-build
-description: Find a Linux kernel documentation patch or series Message-ID by subject in the user's HUST mail archive with hust-mail-cli, retrieve it with b4, and compare full documentation builds before and after applying it in kernel-doc-zh. Use when the input is a patch title or cover letter title.
+description: Find a Linux kernel Chinese documentation patch or series Message-ID by subject in the user's HUST mail archive with hust-mail-cli, retrieve it with b4, select the local zh_CN or zh_TW docs-next repository, and compare full documentation builds before and after applying it. Use when the input is a patch title or cover letter title.
 ---
 
 # LKML 补丁文档编译对比
 
-输入为单个 patch 的标题或 patchset cover letter 的标题。目标是通过 `hust-mail-cli` 在用户的邮件归档中找到**准确的邮件版本和 Message-ID**，再用 `b4` 取回用户指定范围的补丁，并在 `kernel-doc-zh` 的完整隔离副本中比较补丁前后的文档构建。只凭相同的 warning/error 数量不能判定没有回归。
+输入为单个 patch 的标题或 patchset cover letter 的标题。目标是通过 `hust-mail-cli` 在用户的邮件归档中找到**准确的邮件版本和 Message-ID**，再用 `b4` 取回用户指定范围的补丁，按翻译语言选择本地仓库，并在其完整隔离副本中比较补丁前后的文档构建。只凭相同的 warning/error 数量不能判定没有回归。
 
 ## 1. 核对本地规则和目标树
 
-- 找到用户指定的仓库；常见位置是 `~/kernel-doc-zh` 或 `~/Repos/kernel-doc-zh`。以实际 `git rev-parse --show-toplevel` 为准，不要把路径当作固定值。
+- 根据邮件主题和补丁实际修改路径确定翻译语言：`Documentation/translations/zh_CN/` 使用本地 `~/Repos/kernel-doc-zh` 的 `docs-next` 分支；`Documentation/translations/zh_TW/` 使用本地 `~/Repos/linux-zh_TW` 的 `docs-next` 分支。先用 `git rev-parse --show-toplevel` 核对仓库，并确认所选仓库存在本地 `refs/heads/docs-next`。主题与修改路径不一致时，以补丁路径为准；涉及两种语言时分别在对应仓库检查适用性，不把一棵仓库的结果用于另一种语言。
 - 先读该树的 `Documentation/translations/zh_CN/how-to.rst`，尤其是“进行第一次文档编译”和“编译和检查”。以当前文件为准。该指南要求每次构建先 `make cleandocs`，再 `make htmldocs`，并检查 `Documentation/output/` 中的页面。指南示例使用 `sphinx_latest` 虚拟环境；可以使用已有、满足 `Documentation/sphinx/requirements.txt` 的等效环境，前后两次必须相同。
-- 记录分支、HEAD、`git status --short --branch`、可用磁盘空间和构建工具。不要切换、清理或修改原工作区；未提交内容不进入基线。用完整内核源码的隔离 clone，避免只复制 `Documentation/` 或仅构建 `SPHINXDIRS=translations/zh_CN`。`/tmp` 空间不足时选择有足够容量且可写的磁盘目录。
+- 记录所选仓库的当前分支、HEAD、`docs-next` 提交、`git status --short --branch`、可用磁盘空间和构建工具。不要切换、清理或修改原工作区；未提交内容不进入基线。无明确 `base-commit` 时，以所选仓库本地 `docs-next` 的已提交状态为基线，即使原工作区当前位于其他分支。用完整内核源码的隔离 clone，避免只复制 `Documentation/` 或仅构建 `SPHINXDIRS=translations/zh_CN` / `SPHINXDIRS=translations/zh_TW`。`/tmp` 空间不足时选择有足够容量且可写的磁盘目录。
 
 ## 2. 通过 hust-mail-cli 从标题找到确切邮件
 
@@ -24,7 +24,7 @@ description: Find a Linux kernel documentation patch or series Message-ID by sub
 
 - 在隔离工作目录运行 `b4 am -C -o <邮件输出目录> <Message-ID>`，单补丁按上一节加 `-P _`。`-C` 表示不用旧缓存，不是选择 cover。若 b4 默认选到同线程的较新版本而用户指定旧版本，使用 `-v <版本号>` 重新生成；必要时用 `-c` 检查新版本。不要用 `b4 shazam` 操作原仓库。
 - 检查 b4 输出的主题、版本、补丁数、顺序、cover、`Base:` 和生成的 `.mbx`，并与 `hust-mail-cli` 找到的邮件核对。若 b4 缓存或状态目录不可写，在隔离目录设置可写的 `XDG_CACHE_HOME` / `XDG_DATA_HOME`。检索失败、补丁缺失或身份不明时停止应用，报告具体限制。
-- 若邮件给出 `base-commit`，在隔离 clone 中验证该提交并以它作为**两次构建共同的基线**。若没有，记录所选已提交基线（通常为原仓库 HEAD）、来源和适用性；不能干净应用时，不通过强行修改补丁来制造可比结果。补丁依赖或 base 无法确定时说明限制。
+- 若邮件给出 `base-commit`，在所选仓库的隔离 clone 中验证该提交，并以它作为**两次构建共同的基线**。若没有，使用该仓库本地 `docs-next` 的提交，记录提交号、来源和补丁适用性；不能干净应用时，不通过强行修改补丁来制造可比结果。补丁依赖或 base 无法确定时说明限制。
 
 ## 4. 在完整隔离树中做前后两次构建
 
